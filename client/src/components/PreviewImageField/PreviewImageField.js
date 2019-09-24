@@ -231,10 +231,7 @@ class PreviewImageField extends Component {
       return CONSTANTS.DEFAULT_PREVIEW;
     }
     const url = upload.url || data.preview || data.url;
-    if (url) {
-      return (!data.version || url.startsWith('data:image/')) ?
-        url : `${url}?vid=${data.version}`;
-    }
+    if (url) return url;
 
     return null;
   }
@@ -262,7 +259,7 @@ class PreviewImageField extends Component {
     const linkedImage = (data.url && !progress) ? (
       <a
         className="editor__file-preview-link"
-        href={`${data.url}?vid=${data.version}`}
+        href={data.url}
         target="_blank"
         rel="noopener noreferrer"
       >

@@ -167,7 +167,7 @@ describe('GalleryItem', () => {
       expect(item.getThumbnailClassNames()).toBe('gallery-item__thumbnail gallery-item__thumbnail--small');
     });
 
-    it('should return backgroundImage with the correct url with vid if the item is a thumbnail has a version', () => {
+    it('should return backgroundImage with the correct url without vid even if the item is a thumbnail has a version', () => {
       props.item = {
         ...props.item,
         category: 'image',
@@ -180,7 +180,7 @@ describe('GalleryItem', () => {
         <GalleryItem {...props} />
       );
 
-      expect(item.getThumbnailStyles()).toEqual({ backgroundImage: 'url(myThumbnailUrl?vid=123)' });
+      expect(item.getThumbnailStyles()).toEqual({ backgroundImage: 'url(myThumbnailUrl)' });
       expect(item.getThumbnailClassNames()).toBe('gallery-item__thumbnail gallery-item__thumbnail--small');
     });
 
