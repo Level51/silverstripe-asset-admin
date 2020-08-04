@@ -7,12 +7,11 @@ import backend from 'lib/Backend';
 import i18n from 'i18n';
 import classnames from 'classnames';
 import * as galleryActions from 'state/gallery/GalleryActions';
-import * as breadcrumbsActions from 'state/breadcrumbs/BreadcrumbsActions';
 import * as queuedFilesActions from 'state/queuedFiles/QueuedFilesActions';
 import * as displaySearchActions from 'state/displaySearch/DisplaySearchActions';
 import Editor from 'containers/Editor/Editor';
 import Gallery from 'containers/Gallery/Gallery';
-import Breadcrumb from 'components/Breadcrumb/Breadcrumb';
+import AssetAdminBreadcrumb from './AssetAdminBreadcrumb';
 import Toolbar from 'components/Toolbar/Toolbar';
 import { withApollo } from 'react-apollo';
 import Search, { hasFilters } from 'components/Search/Search';
@@ -23,62 +22,9 @@ import publishFilesMutation from 'state/files/publishFilesMutation';
 import CONSTANTS from 'constants/index';
 import configShape from 'lib/configShape';
 import { injectGraphql } from 'lib/Injector';
-
-function getFormSchema({ config, viewAction, folderId, fileId, type }) {
-  let schemaUrl = null;
-  let targetId = null;
-
-  if (viewAction === CONSTANTS.ACTIONS.CREATE_FOLDER) {
-    schemaUrl = config.form.folderCreateForm.schemaUrl;
-    targetId = folderId;
-
-    return { schemaUrl, targetId };
-  }
-
-  if (viewAction === CONSTANTS.ACTIONS.EDIT_FILE) {
-    switch (type) {
-      case 'insert-media':
-        schemaUrl = config.form.fileInsertForm.schemaUrl;
-        break;
-      case 'insert-link':
-        schemaUrl = config.form.fileEditorLinkForm.schemaUrl;
-        break;
-      case 'select':
-        schemaUrl = config.form.fileSelectForm.schemaUrl;
-        break;
-      case 'admin':
-      default:
-        schemaUrl = config.form.fileEditForm.schemaUrl;
-        break;
-    }
-
-    if (fileId) {
-      targetId = fileId;
-
-      return { schemaUrl, targetId };
-    }
-  }
-
-  return {};
-}
-
-
-/**
- * Check if either of the two objects differ
- *
- * @param {Object} left
- * @param {Object} right
- */
-function compare(left, right) {
-  // Check for falsiness
-  if ((left && !right) || (right && !left)) {
-    return true;
-  }
-
-  // Fall back to object comparison
-  return left && right && (left.id !== right.id || left.name !== right.name);
-}
-
+import BulkDeleteConfirmation from '../BulkDeleteConfirmation/BulkDeleteConfirmation';
+import * as confirmDeletionActions from 'state/confirmDeletion/ConfirmDeletionActions';
+import getFormSchema from 'lib/getFormSchema';
 
 class AssetAdmin extends Component {
   constructor(props) {
@@ -105,19 +51,9 @@ class AssetAdmin extends Component {
     this.handleUploadQueue = this.handleUploadQueue.bind(this);
     this.handleCreateFolder = this.handleCreateFolder.bind(this);
     this.handleMoveFilesSuccess = this.handleMoveFilesSuccess.bind(this);
-    this.setBreadcrumbs = this.setBreadcrumbs.bind(this);
-  }
-
-  componentDidMount() {
-    this.setBreadcrumbs(this.props);
   }
 
   componentWillReceiveProps(props) {
-    const viewChanged = compare(this.props.folder, props.folder);
-    if (viewChanged || hasFilters(props.query.filter) !== hasFilters(this.props.query.filter)) {
-      this.setBreadcrumbs(props);
-    }
-
     if (!props.loading && props.folder && props.folderId !== props.folder.id) {
       props.onReplaceUrl(props.folder.id, props.fileId, props.query, props.viewAction);
     }
@@ -136,81 +72,27 @@ class AssetAdmin extends Component {
     return 0;
   }
 
-  /**
-   * Assign breadcrumbs from selected folder
-   *
-   * @param {Object} props
-   */
-  setBreadcrumbs(props) {
-    const folder = props.folder;
-    const query = props.query;
-    // Set root breadcrumb
-    const breadcrumbs = [{
-      text: i18n._t('AssetAdmin.FILES', 'Files'),
-      href: this.props.getUrl && this.props.getUrl(),
-      onClick: (event) => {
-        event.preventDefault();
-        this.handleBrowse();
-      },
-    }];
-
-    if (folder && folder.id) {
-      // Add parent folders
-      if (folder.parents) {
-        folder.parents.forEach((parent) => {
-          breadcrumbs.push({
-            text: parent.title,
-            href: this.props.getUrl && this.props.getUrl(parent.id),
-            onClick: (event) => {
-              event.preventDefault();
-              this.handleBrowse(parent.id);
-            },
-          });
-        });
-      }
-
-      // Add current folder
-      breadcrumbs.push({
-        text: folder.title,
-        href: this.props.getUrl && this.props.getUrl(folder.id),
-        onClick: (event) => {
-          event.preventDefault();
-          this.handleBrowse(folder.id);
-        },
-        icon: {
-          className: 'icon font-icon-edit-list',
-          onClick: this.handleFolderIcon,
-        },
-      });
-    }
-    // Search leaf if there was a search entered
-    if (hasFilters(query.filter)) {
-      breadcrumbs.push({
-        text: i18n._t('LeftAndMain.SEARCHRESULTS', 'Search results'),
-      });
-    }
-
-    this.props.actions.breadcrumbsActions.setBreadcrumbs(breadcrumbs);
-  }
-
   getFiles() {
     const {
       files,
       queuedFiles,
+      folderId
     } = this.props;
 
     const combinedFilesList = [
       // Exclude uploaded files that have been reloaded via graphql
       ...queuedFiles
         .items
-        .filter(item => !item.id || !files.find(file => file.id === item.id)),
+        .filter(item =>
+          (!item.id || !files.find(file => file.id === item.id)) &&
+          (!item.hasOwnProperty('uploadedToFolderId') || item.uploadedToFolderId === folderId)
+        ),
       ...files,
     ];
 
-    // Seperate folder and files then return an array with folders at the top (for table view)
+    // Separate folder and files then return an array with folders at the top (for table view)
     const foldersList = combinedFilesList.filter((file) => file.type === 'folder');
     const filesList = combinedFilesList.filter((file) => file.type !== 'folder');
-
     return foldersList.concat(filesList);
   }
 
@@ -312,7 +194,7 @@ class AssetAdmin extends Component {
    * @param {Object} endpointConfig
    * @param {Boolean} includeToken
    * @returns {Function}
-     */
+   */
   createEndpoint(endpointConfig, includeToken = true) {
     return backend.createEndpointFetcher(Object.assign(
       {},
@@ -348,12 +230,9 @@ class AssetAdmin extends Component {
   }
 
   /**
-   * Handler for when the folder icon is clicked (to edit hte folder)
-   *
-   * @param {Event} event
+   * Handler for when the folder icon is clicked (to edit the folder)
    */
-  handleFolderIcon(event) {
-    event.preventDefault();
+  handleFolderIcon() {
     this.handleOpenFile(this.getFolderId());
   }
 
@@ -431,9 +310,7 @@ class AssetAdmin extends Component {
    */
   handleOpenFolder(folderId) {
     // Reset any potential search filters and pagination, but keep other view options
-    const query = Object.assign({}, this.props.query);
-    delete query.page;
-    delete query.filter;
+    const { page, filter, ...query } = this.props.query;
     this.handleBrowse(folderId, null, query);
   }
 
@@ -443,6 +320,8 @@ class AssetAdmin extends Component {
    * @param {array} ids
    */
   handleDelete(ids) {
+    this.props.actions.confirmDeletion.deleting();
+
     const files = ids.map(id => {
       const result = this.findFile(id);
       if (!result) {
@@ -474,7 +353,35 @@ class AssetAdmin extends Component {
         this.props.actions.files.readFiles();
 
         return deleteFiles;
-      });
+      })
+      .then((resultItems) => {
+        const successes = resultItems.filter((result) => result).length;
+        if (successes !== ids.length) {
+          this.props.actions.gallery.setErrorMessage(
+            i18n.sprintf(
+              i18n._t(
+                'AssetAdmin.BULK_ACTIONS_DELETE_FAIL',
+                '%s folders/files were successfully deleted, but %s files were not able to be deleted.'
+              ),
+              successes,
+              ids.length - successes
+            )
+          );
+          this.props.actions.gallery.setNoticeMessage(null);
+        } else {
+          this.props.actions.gallery.setNoticeMessage(
+            i18n.sprintf(
+              i18n._t('AssetAdmin.BULK_ACTIONS_DELETE_SUCCESS', '%s folders/files were successfully deleted.'),
+              successes
+            )
+          );
+          this.props.actions.gallery.setErrorMessage(null);
+          this.props.actions.gallery.deselectFiles();
+        }
+
+        return resultItems;
+      })
+      .finally(this.props.actions.confirmDeletion.reset);
   }
 
   /**
@@ -694,7 +601,6 @@ class AssetAdmin extends Component {
         graphQLErrors={this.props.graphQLErrors}
         createFileApiUrl={createFileApiUrl}
         createFileApiMethod={createFileApiMethod}
-        onDelete={this.handleDelete}
         onInsertMany={this.props.onInsertMany}
         onPublish={this.doPublish}
         onUnpublish={this.doUnpublish}
@@ -712,6 +618,7 @@ class AssetAdmin extends Component {
         sectionConfig={config}
         loading={this.props.loading}
         maxFilesSelect={this.props.maxFiles}
+        dialog={this.props.dialog}
       />
     );
   }
@@ -722,53 +629,76 @@ class AssetAdmin extends Component {
    * @returns {object}
    */
   renderEditor() {
-    const config = this.props.sectionConfig;
+    const {
+      sectionConfig: config,
+      viewAction,
+      type,
+      fileId,
+      dialog,
+      requireLinkText,
+      fileSelected
+    } = this.props;
     const { schemaUrl, targetId } = getFormSchema({
       config,
-      viewAction: this.props.viewAction,
+      viewAction,
       folderId: this.getFolderId(),
-      type: this.props.type,
-      fileId: this.props.fileId,
+      type,
+      fileId,
     });
 
     if (!schemaUrl) {
       return null;
     }
 
-    return (
-      <Editor
-        className={(this.props.dialog) ? 'editor--dialog' : ''}
-        targetId={targetId}
-        file={this.findFile(targetId)}
-        onClose={this.handleCloseFile}
-        schemaUrl={schemaUrl}
-        schemaUrlQueries={this.props.requireLinkText ? [{ name: 'requireLinkText', value: true }] : []}
-        onSubmit={this.handleSubmitEditor}
-        onDelete={this.handleDelete}
-        onUnpublish={this.handleUnpublish}
-        addToCampaignSchemaUrl={config.form.addToCampaignForm.schemaUrl}
-      />
-    );
+    const schemaUrlQueries = [];
+    if (requireLinkText) {
+      schemaUrlQueries.push({ name: 'requireLinkText', value: true });
+    }
+
+    if (fileSelected) {
+      schemaUrlQueries.push({ name: 'fileSelected', value: true });
+    }
+
+    const editorProps = {
+      dialog,
+      targetId,
+      schemaUrl,
+      schemaUrlQueries,
+      file: this.findFile(targetId),
+      onClose: this.handleCloseFile,
+      onSubmit: this.handleSubmitEditor,
+      onUnpublish: this.handleUnpublish,
+      addToCampaignSchemaUrl: config.form.addToCampaignForm.schemaUrl
+    };
+
+    return <Editor {...editorProps} />;
   }
 
   render() {
-    const showBackButton = Boolean(
-      (this.props.folderId)
-      || hasFilters(this.props.query.filter)
-    );
+    const { folder, folderId, query, getUrl, type, maxFiles, filter, toolbarChildren } = this.props;
+
+    const showBackButton = Boolean(folderId || hasFilters(query.filter));
     const searchFormSchemaUrl = this.props.sectionConfig.form.fileSearchForm.schemaUrl;
-    const filters = this.props.query.filter || {};
+    const filters = filter || {};
     const classNames = classnames(
       'fill-height asset-admin',
-      this.props.type === 'select' && {
-        'asset-admin--single-select': this.props.maxFiles === 1,
-        'asset-admin--multi-select': this.props.maxFiles !== 1,
+      type === 'select' && {
+        'asset-admin--single-select': maxFiles === 1,
+        'asset-admin--multi-select': maxFiles !== 1,
       }
     );
-    const showSearch = hasFilters(this.props.query.filter) || this.props.showSearch;
+    const showSearch = hasFilters(filter) || this.props.showSearch;
     const onSearchToggle = this.props.actions.displaySearch ?
       this.props.actions.displaySearch.toggleSearch :
       undefined;
+
+    const breadcrumbProps = {
+      folder,
+      query,
+      getUrl,
+      onBrowse: this.handleBrowse,
+      onFolderIcon: this.handleFolderIcon
+    };
 
     return (
       <div className={classNames}>
@@ -776,10 +706,10 @@ class AssetAdmin extends Component {
           showBackButton={showBackButton}
           onBackButtonClick={this.handleBackButtonClick}
         >
-          <Breadcrumb multiline />
+          <AssetAdminBreadcrumb {...breadcrumbProps} />
           <div className="asset-admin__toolbar-extra pull-xs-right fill-width vertical-align-items">
             <SearchToggle toggled={showSearch} onToggle={onSearchToggle} />
-            {this.props.toolbarChildren}
+            {toolbarChildren}
           </div>
         </Toolbar>
         {showSearch && <Search
@@ -795,6 +725,7 @@ class AssetAdmin extends Component {
           {this.renderGallery()}
           {this.renderEditor()}
         </div>
+        <BulkDeleteConfirmation onConfirm={this.handleDelete} />
       </div>
     );
   }
@@ -834,6 +765,7 @@ AssetAdmin.propTypes = {
   loading: PropTypes.bool,
   actions: PropTypes.object,
   maxFiles: PropTypes.number,
+  fileSelected: PropTypes.bool
 };
 
 AssetAdmin.defaultProps = {
@@ -847,12 +779,14 @@ AssetAdmin.defaultProps = {
   maxFiles: null,
 };
 
-function mapStateToProps(state) {
+function mapStateToProps(state, ownProps) {
+  const { formSchema } = state.assetAdmin.modal;
   return {
     securityId: state.config.SecurityID,
     // TODO Refactor "queued files" into separate visual area and remove coupling here
     queuedFiles: state.assetAdmin.queuedFiles,
-    showSearch: state.assetAdmin.displaySearch.isOpen
+    showSearch: state.assetAdmin.displaySearch.isOpen,
+    type: (formSchema && formSchema.type) || ownProps.type,
   };
 }
 
@@ -860,15 +794,15 @@ function mapDispatchToProps(dispatch) {
   return {
     actions: {
       gallery: bindActionCreators(galleryActions, dispatch),
-      breadcrumbsActions: bindActionCreators(breadcrumbsActions, dispatch),
       displaySearch: bindActionCreators(displaySearchActions, dispatch),
       // TODO Refactor "queued files" into separate visual area and remove coupling here
       queuedFiles: bindActionCreators(queuedFilesActions, dispatch),
+      confirmDeletion: bindActionCreators(confirmDeletionActions, dispatch)
     },
   };
 }
 
-export { AssetAdmin as Component, getFormSchema };
+export { AssetAdmin as Component };
 
 export default compose(
   connect(mapStateToProps, mapDispatchToProps),
@@ -876,5 +810,5 @@ export default compose(
   deleteFilesMutation,
   unpublishFilesMutation,
   publishFilesMutation,
-  (component) => withApollo(component)
+  withApollo
 )(AssetAdmin);

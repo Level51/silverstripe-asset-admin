@@ -7,6 +7,7 @@ import CONSTANTS from 'constants/index';
 import fieldHolder from 'components/FieldHolder/FieldHolder';
 import fileShape from 'lib/fileShape';
 import * as uploadFieldActions from 'state/uploadField/UploadFieldActions';
+import * as modalActions from 'state/modal/ModalActions';
 import PropTypes from 'prop-types';
 
 /**
@@ -123,6 +124,11 @@ class UploadField extends Component {
     setFiles(id, data.files);
   }
 
+  /**
+   * Returns the max number of files allowed for uploading
+   *
+   * @return {?Number}
+   */
   getMaxFiles() {
     const maxFiles = this.props.data.multi ? this.props.data.maxFiles : 1;
     if (maxFiles === null || typeof maxFiles === 'undefined') {
@@ -137,6 +143,15 @@ class UploadField extends Component {
     const allowed = Math.max(maxFiles - filesCount, 0);
 
     return allowed;
+  }
+
+  /**
+   * Returns the max allowed filesize (if set)
+   *
+   * @return {?Number}
+   */
+  getMaxFilesize() {
+    return this.props.data.maxFilesize || null;
   }
 
   /**
@@ -219,6 +234,7 @@ class UploadField extends Component {
    * @param {Object} selectingItem
    */
   handleReplaceShow(event, selectingItem) {
+    this.props.actions.modal.initFormStack('select', 'admin');
     this.setState({
       selecting: true,
       selectingItem,
@@ -258,6 +274,7 @@ class UploadField extends Component {
    */
   handleAddShow(event) {
     event.preventDefault();
+    this.props.actions.modal.initFormStack('select', 'admin');
     this.setState({
       selecting: true,
       selectingItem: null,
@@ -268,6 +285,7 @@ class UploadField extends Component {
    * Close 'add from files' dialog
    */
   handleHide() {
+    this.props.actions.modal.reset();
     this.setState({
       selecting: false,
       selectingItem: null,
@@ -378,11 +396,14 @@ class UploadField extends Component {
       width: CONSTANTS.SMALL_THUMBNAIL_WIDTH,
     };
     const maxFiles = this.getMaxFiles();
+    const maxFilesize = this.getMaxFilesize();
+
     const dropzoneOptions = {
       url: this.props.data.createFileEndpoint.url,
       method: this.props.data.createFileEndpoint.method,
       paramName: 'Upload',
       maxFiles,
+      maxFilesize,
       thumbnailWidth: CONSTANTS.SMALL_THUMBNAIL_WIDTH,
       thumbnailHeight: CONSTANTS.SMALL_THUMBNAIL_HEIGHT,
     };
@@ -414,7 +435,7 @@ class UploadField extends Component {
           onClick={this.handleUploadButton}
           className="uploadfield__upload-button"
         >
-          {i18n._t('AssetAdmin.BROWSE', 'Browse')}
+          {i18n._t('AssetAdmin.UPLOADFIELD_UPLOAD_NEW', 'Upload new')}
         </button>
       );
     }
@@ -433,7 +454,7 @@ class UploadField extends Component {
           onClick={this.handleAddShow}
           className="uploadfield__add-button"
         >
-          {i18n._t('AssetAdmin.ADD_FILES', 'Add from files')}
+          {i18n._t('AssetAdmin.UPLOADFIELD_CHOOSE_EXISTING', 'Choose existing')}
         </button>
       );
     }
@@ -570,6 +591,7 @@ function mapDispatchToProps(dispatch) {
   return {
     actions: {
       uploadField: bindActionCreators(uploadFieldActions, dispatch),
+      modal: bindActionCreators(modalActions, dispatch)
     },
   };
 }

@@ -13,6 +13,7 @@ import CONSTANTS from 'constants/index';
 import FormAlert from 'components/FormAlert/FormAlert';
 import * as galleryActions from 'state/gallery/GalleryActions';
 import * as queuedFilesActions from 'state/queuedFiles/QueuedFilesActions';
+import * as confirmDeletionActions from 'state/confirmDeletion/ConfirmDeletionActions';
 import moveFilesMutation from 'state/files/moveFilesMutation';
 import { withApollo } from 'react-apollo';
 import { SelectableGroup } from 'react-selectable';
@@ -21,6 +22,20 @@ import configShape from 'lib/configShape';
 import MoveModal from '../MoveModal/MoveModal';
 import { inject } from 'lib/Injector';
 import PropTypes from 'prop-types';
+
+/**
+ * List of possible possible bulk actions.
+ */
+const ACTION_TYPES = {
+  DELETE: 'delete',
+  EDIT: 'edit',
+  MOVE: 'move',
+  PUBLISH: 'publish',
+  UNPUBLISH: 'unpublish',
+  INSERT: 'insert',
+  ADMIN: 'admin',
+  SELECT: 'select'
+};
 
 class Gallery extends Component {
   constructor(props) {
@@ -46,9 +61,9 @@ class Gallery extends Component {
     this.handleBulkEdit = this.handleBulkEdit.bind(this);
     this.handleBulkPublish = this.handleBulkPublish.bind(this);
     this.handleBulkUnpublish = this.handleBulkUnpublish.bind(this);
-    this.handleBulkDelete = this.handleBulkDelete.bind(this);
     this.handleBulkMove = this.handleBulkMove.bind(this);
     this.handleBulkInsert = this.handleBulkInsert.bind(this);
+    this.handleBeginSelection = this.handleBeginSelection.bind(this);
     this.handleGroupSelect = this.handleGroupSelect.bind(this);
     this.handleClearSelection = this.handleClearSelection.bind(this);
     this.toggleSelectConcat = this.toggleSelectConcat.bind(this);
@@ -205,7 +220,7 @@ class Gallery extends Component {
   getSelectableFiles() {
     const selectable = this.props.files.filter(file => file.id);
     // When selecting, don't include any folders
-    if (this.props.type === 'select') {
+    if (this.props.type === ACTION_TYPES.SELECT) {
       return selectable.filter((item) => item.type !== 'folder');
     }
 
@@ -219,42 +234,6 @@ class Gallery extends Component {
    */
   handleBulkInsert(event, items) {
     this.props.onInsertMany(event, items);
-  }
-
-  /**
-   * Delete a list of items
-   *
-   * @param {Event} event
-   * @param {Array} items
-   * @returns {Promise}
-   */
-  handleBulkDelete(event, items) {
-    return this.props.onDelete(items.map(item => item.id))
-      .then((resultItems) => {
-        const successes = resultItems.filter((result) => result).length;
-        if (successes !== items.length) {
-          this.props.actions.gallery.setErrorMessage(
-            i18n.sprintf(
-              i18n._t(
-                'AssetAdmin.BULK_ACTIONS_DELETE_FAIL',
-                '%s folders/files were successfully deleted, but %s files were not able to be deleted.'
-              ),
-              successes,
-              items.length - successes
-            )
-          );
-          this.props.actions.gallery.setNoticeMessage(null);
-        } else {
-          this.props.actions.gallery.setNoticeMessage(
-            i18n.sprintf(
-              i18n._t('AssetAdmin.BULK_ACTIONS_DELETE_SUCCESS', '%s folders/files were successfully deleted.'),
-              successes
-            )
-          );
-          this.props.actions.gallery.setErrorMessage(null);
-          this.props.actions.gallery.deselectFiles();
-        }
-      });
   }
 
   /**
@@ -564,6 +543,28 @@ class Gallery extends Component {
   }
 
   /**
+   * Pick if the selection started from inside the pagination. If it started from inside the
+   * pagination, cancel it to prevent inteference with the normal pagination.
+   * @param Event e
+   * @returns {boolean}
+   */
+  handleBeginSelection(e) {
+    /** @type Node */
+    let node = e.target;
+    // Loop the nodes until we find the root of the pagination or the root of the selectable area
+    while (node) {
+      if (node.classList.contains('griddle-footer')) {
+        return false;
+      }
+      if (node.classList.contains('gallery__main--selectable')) {
+        break;
+      }
+      node = node.parentNode;
+    }
+    return true;
+  }
+
+  /**
    * Handles a user drilling down into a folder.
    *
    * @param {Event} event - Event object.
@@ -591,7 +592,7 @@ class Gallery extends Component {
     }
 
     if ((!this.props.selectedFiles.length || this.props.maxFilesSelect === 1) &&
-      this.props.type === 'select'
+      this.props.type === ACTION_TYPES.SELECT
     ) {
       this.handleSelect(event, file);
     }
@@ -696,9 +697,12 @@ class Gallery extends Component {
    * @returns {XML}
    */
   renderBulkActions() {
-    const actionFilter = (this.props.type === 'select')
-      ? action => action.value === 'insert'
-      : action => action.value !== 'insert';
+    const { type, dialog, maxFilesSelect, files, selectedFiles } = this.props;
+
+    // When rendering gallery in modal or in select mode, filter all action but insert.
+    const actionFilter = (type === ACTION_TYPES.SELECT || dialog)
+      ? action => action.value === ACTION_TYPES.INSERT
+      : action => action.value !== ACTION_TYPES.INSERT;
 
     const actions = CONSTANTS.BULK_ACTIONS
       .filter(actionFilter)
@@ -707,22 +711,28 @@ class Gallery extends Component {
           return action;
         }
         switch (action.value) {
-          case 'delete': {
-            return { ...action, callback: this.handleBulkDelete };
+          case ACTION_TYPES.DELETE: {
+            return {
+              ...action,
+              callback: (event, items) => {
+                this.props.actions.confirmDeletion.confirm(items);
+              },
+              confirm: undefined
+            };
           }
-          case 'edit': {
+          case ACTION_TYPES.EDIT: {
             return { ...action, callback: this.handleBulkEdit };
           }
-          case 'move': {
+          case ACTION_TYPES.MOVE: {
             return { ...action, callback: this.handleBulkMove };
           }
-          case 'publish': {
+          case ACTION_TYPES.PUBLISH: {
             return { ...action, callback: this.handleBulkPublish };
           }
-          case 'unpublish': {
+          case ACTION_TYPES.UNPUBLISH: {
             return { ...action, callback: this.handleBulkUnpublish };
           }
-          case 'insert': {
+          case ACTION_TYPES.INSERT: {
             return { ...action, callback: this.handleBulkInsert, color: 'primary' };
           }
           default: {
@@ -731,19 +741,19 @@ class Gallery extends Component {
         }
       });
 
-    const selected = this.props.selectedFiles
-      .map(id => this.props.files.find(file => file && id === file.id))
+    const selected = selectedFiles
+      .map(id => files.find(file => file && id === file.id))
       .filter(item => item);
 
-    if (selected.length > 0 && ['admin', 'select'].includes(this.props.type)) {
+    if (selected.length > 0 && [ACTION_TYPES.ADMIN, ACTION_TYPES.SELECT].includes(type)) {
       return (
         <BulkActions
           actions={actions}
           items={selected}
-          total={this.props.maxFilesSelect}
+          total={maxFilesSelect}
           key={selected.length > 0}
           container={this.gallery}
-          showCount={this.props.maxFilesSelect !== 1}
+          showCount={maxFilesSelect !== 1}
         />
       );
     }
@@ -766,17 +776,28 @@ class Gallery extends Component {
     const {
       type,
       loading,
+      dialog,
       page,
       totalCount,
       limit,
       sort,
       selectedFiles,
       badges,
+      maxFilesSelect,
+      sectionConfig
     } = this.props;
 
+    // Allow selection of file when:
+    // * explictely selecting files
+    // * plain asset-admin section
+    // * editing files in a multi-select upload field
+    const selectableItems =
+      type === ACTION_TYPES.SELECT ||
+      (type === ACTION_TYPES.ADMIN && (!maxFilesSelect || maxFilesSelect > 1));
+
     const props = {
-      selectableItems: ['admin', 'select'].includes(type),
-      selectableFolders: this.props.type !== 'select',
+      selectableItems,
+      selectableFolders: type !== ACTION_TYPES.SELECT && !dialog,
       files,
       loading,
       page,
@@ -794,9 +815,9 @@ class Gallery extends Component {
       onDropFiles: this.handleMoveFiles,
       onRemoveErroredUpload: this.handleRemoveErroredUpload,
       onEnableDropzone: this.handleEnableDropzone,
-      sectionConfig: this.props.sectionConfig,
-      canDrag: this.props.type === 'admin',
-      maxFilesSelect: this.props.maxFilesSelect,
+      sectionConfig,
+      canDrag: type === ACTION_TYPES.ADMIN,
+      maxFilesSelect,
     };
 
     return <GalleryView {...props} />;
@@ -899,7 +920,7 @@ class Gallery extends Component {
     const galleryClasses = [
       'panel', 'panel--padded', 'panel--scrollable', 'gallery__main', 'fill-height',
     ];
-    if (this.props.type === 'insert') {
+    if (this.props.type === ACTION_TYPES.INSERT) {
       galleryClasses.push('insert-media-modal__main');
     }
 
@@ -917,10 +938,11 @@ class Gallery extends Component {
         <GalleryDND className={galleryClasses.join(' ')}>
           {this.renderToolbar()}
           <SelectableGroup
-            enabled={this.props.view === 'tile' && this.props.type === 'admin'}
+            enabled={this.props.view === 'tile' && this.props.type === ACTION_TYPES.ADMIN}
             className="flexbox-area-grow fill-height gallery__main--selectable"
             onSelection={this.handleGroupSelect}
             onNonItemClick={this.handleClearSelection}
+            onBeginSelection={this.handleBeginSelection}
             preventDefault={false}
             fixedPosition
           >
@@ -998,15 +1020,15 @@ const galleryViewPropTypes = Object.assign({}, sharedPropTypes, {
   selectableFolders: PropTypes.bool,
   onSelect: PropTypes.func,
   onCancelUpload: PropTypes.func,
-  onDelete: PropTypes.func,
   onRemoveErroredUpload: PropTypes.func,
   onEnableDropzone: PropTypes.func,
 });
 
 Gallery.defaultProps = Object.assign({}, sharedDefaultProps, {
-  type: 'admin',
+  type: ACTION_TYPES.ADMIN,
   view: 'tile',
   enableDropzone: true,
+  dialog: false,
 });
 
 Gallery.propTypes = Object.assign({}, sharedPropTypes, {
@@ -1014,10 +1036,9 @@ Gallery.propTypes = Object.assign({}, sharedPropTypes, {
   onSuccessfulUploadQueue: PropTypes.func,
   onCreateFolder: PropTypes.func,
   onMoveFilesSuccess: PropTypes.func,
-  onDelete: PropTypes.func,
   onPublish: PropTypes.func,
   onUnpublish: PropTypes.func,
-  type: PropTypes.oneOf(['insert-media', 'insert-link', 'select', 'admin']),
+  type: PropTypes.oneOf(['insert-media', 'insert-link', ACTION_TYPES.SELECT, ACTION_TYPES.ADMIN]),
   view: PropTypes.oneOf(['tile', 'table']),
   lastSelected: PropTypes.number,
   dialog: PropTypes.bool,
@@ -1047,7 +1068,7 @@ Gallery.propTypes = Object.assign({}, sharedPropTypes, {
     field: PropTypes.string.isRequired,
     direction: PropTypes.oneOf(['asc', 'desc']).isRequired,
     label: PropTypes.string.isRequired,
-  })).isRequired,
+  })).isRequired
 });
 
 function mapStateToProps(state, ownProps) {
@@ -1090,6 +1111,7 @@ function mapDispatchToProps(dispatch) {
     actions: {
       gallery: bindActionCreators(galleryActions, dispatch),
       queuedFiles: bindActionCreators(queuedFilesActions, dispatch),
+      confirmDeletion: bindActionCreators(confirmDeletionActions, dispatch)
     },
   };
 }

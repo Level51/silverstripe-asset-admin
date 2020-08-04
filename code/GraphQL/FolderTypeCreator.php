@@ -82,6 +82,12 @@ class FolderTypeCreator extends FileTypeCreator
             'canDelete' => [
                 'type' => Type::boolean(),
             ],
+            'hasRestrictedAccess' => [
+                'type' => Type::boolean(),
+            ],
+            'visibility' => [
+                'type' => Type::string(),
+            ],
             'children' => [
                 'type' => $childrenConnection->toType(),
                 'args' => $childrenConnection->args(),
@@ -162,9 +168,6 @@ class FolderTypeCreator extends FileTypeCreator
 
 
         // Ensure that we're looking at a subset of relevant data.
-        $result = $childrenConnection->resolveList($list, $args);
-        $list = $result['edges'];
-
         if (!isset($args['sortBy'])) {
             // only show folders first if no manual ordering is set
 
@@ -217,7 +220,7 @@ class FolderTypeCreator extends FileTypeCreator
         $canViewList = $list->filter('ID', $canViewIDs ?: 0)
             ->limit(null);
 
-        $result['edges'] = $canViewList;
+        $result = $childrenConnection->resolveList($list, $args);
 
         return $result;
     }

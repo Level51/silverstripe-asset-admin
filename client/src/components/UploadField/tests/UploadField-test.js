@@ -52,10 +52,15 @@ describe('UploadField', () => {
           setFiles: jest.fn(),
           removeFile: jest.fn(),
         },
+        modal: {
+          initFormStack: jest.fn(),
+          reset: jest.fn(),
+        }
       },
       data: {
         multi: true,
         maxFiles: null,
+        maxFilesize: null,
         createFileEndpoint: {
           url: 'test',
           method: 'POST',

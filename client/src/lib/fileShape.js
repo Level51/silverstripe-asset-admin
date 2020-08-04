@@ -12,10 +12,12 @@ const fileShape = PropTypes.shape({
   height: PropTypes.number,
   category: PropTypes.oneOfType([PropTypes.bool, PropTypes.string]),
   id: PropTypes.number,
-  inUseCount: PropTypes.number,
   url: PropTypes.string,
   title: PropTypes.string,
   progress: PropTypes.number,
+  visibility: PropTypes.string,
+  hasRestrictedAccess: PropTypes.bool,
+  isTrackedFormUpload: PropTypes.bool
 });
 
 export default fileShape;

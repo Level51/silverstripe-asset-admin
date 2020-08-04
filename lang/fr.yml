@@ -19,7 +19,6 @@ fr:
     AlignmentRight: 'A droite du texte'
     AlignmentRightAlone: 'A droite'
     AltText: 'Texte alternatif (alt)'
-    AltTextDescription: 'En remplacement de l''image si elle ne peut s''afficher'
     AppCategoryArchive: Archiver
     AppCategoryAudio: Audio
     AppCategoryDocument: Document
@@ -31,7 +30,6 @@ fr:
     CreatePermissionDenied: 'Vous n''avez pas l''autorisation d''ajouter des fichiers'
     CurrentFolderOnly: 'Limiter au dossier actuel et ses sous-dossiers ?'
     DELETE_BUTTON: Supprimer
-    EditLink: 'Modifier le fichier original'
     ErrorItemPermissionDenied: 'Vous n''avez pas les autorisations requises pour modifier {ObjectTitle}'
     ErrorNotFound: '{Type} introuvable'
     FILE_NOT_FOUND: 'Fichier introuvable'
@@ -51,7 +49,6 @@ fr:
     Placement: Emplacement
     SAVEDFILE: 'Fichier sauvegardé'
     TitleTooltip: 'Texte (info-bulle)'
-    TitleTooltipDescription: 'Pour des informations complémentaires sur l''image'
     UNKNOWN: Inconnu
     UNPUBLISH_BUTTON: Dépublier
     UPLOADEDFILE: 'Fichier téléchargé'

@@ -2,9 +2,9 @@
 
 // mock sub-components, as they could rely on a Redux store context and not necessary for unit test
 jest.mock('containers/Editor/Editor');
-jest.mock('components/Breadcrumb/Breadcrumb');
 jest.mock('components/Search/Search');
 jest.mock('containers/Gallery/Gallery');
+jest.mock('containers/BulkDeleteConfirmation/BulkDeleteConfirmation');
 
 import React from 'react';
 import ReactTestUtils from 'react-dom/test-utils';
@@ -67,9 +67,8 @@ describe('AssetAdmin', () => {
       actions: {
         gallery: {
           deselectFiles: jest.fn(),
-        },
-        breadcrumbsActions: {
-          setBreadcrumbs: jest.fn(),
+          setErrorMessage: jest.fn(),
+          setNoticeMessage: jest.fn(),
         },
         queuedFiles: {
           addQueuedFile: jest.fn(),
@@ -84,6 +83,9 @@ describe('AssetAdmin', () => {
           publishFiles: jest.fn(() => Promise.resolve({ data: { publishFiles: [] } })),
           unpublishFiles: jest.fn(() => Promise.resolve({ data: { unpublishFiles: [] } })),
         },
+        confirmDeletion: {
+          deleting: jest.fn(),
+        }
       },
     };
   });
@@ -266,6 +268,126 @@ describe('AssetAdmin', () => {
       component = ReactTestUtils.renderIntoDocument(<AssetAdmin {...props} />);
       component.handleUploadQueue();
       expect(props.actions.files.readFiles).not.toBeCalled();
+    });
+  });
+
+  describe('getFiles', () => {
+    const deriveFilesIDs = (_props) => {
+      props = { ...props, ..._props };
+      const component = ReactTestUtils.renderIntoDocument(<AssetAdmin {...props} />);
+      return component.getFiles().map(({ id }) => id);
+    };
+
+    beforeEach(() => {
+      props.files = [];
+      props.queuedFiles = { items: [] };
+      props.folderId = 99;
+    });
+
+    it('no files provided', () => {
+      expect(deriveFilesIDs({})).toEqual([]);
+    });
+
+    it('some files in a folder', () => {
+      expect(deriveFilesIDs({
+        files: [
+          { id: 1, name: 'file one', type: 'image/jpeg', parent: { id: 99 } },
+          { id: 2, name: 'file two', type: 'image/jpeg', parent: { id: 99 } }
+        ]
+      })).toEqual([1, 2]);
+    });
+
+    it('files+queuedFiles', () => {
+      expect(deriveFilesIDs({
+        files: [
+          { id: 1, name: 'file one', type: 'image/jpeg', parent: { id: 99 } },
+          { id: 2, name: 'file two', type: 'image/jpeg', parent: { id: 99 } }
+        ],
+        queuedFiles: {
+          items: [
+            { id: 3, name: 'file three', type: 'image/jpeg', parent: { id: 99 } },
+            { id: 4, name: 'file four', type: 'image/jpeg', parent: { id: 99 } }
+          ]
+        }
+      })).toEqual([3, 4, 1, 2]);
+    });
+
+    it('upload error e.g. invalid file extension', () => {
+      expect(deriveFilesIDs({
+        files: [
+          { id: 1, name: 'file one', type: 'image/jpeg', parent: { id: 99 } },
+        ],
+        queuedFiles: {
+          items: [
+            {
+              id: 0,
+              name: 'invalid file attempted to upload',
+              type: 'alien/artifact',
+              parent: { id: 0 },
+              message: { type: 'error', value: 'Invalid file extension' },
+              uploadedToFolderId: 99,
+            },
+          ]
+        }
+      })).toEqual([0, 1]);
+    });
+
+    it('upload in progress', () => {
+      expect(deriveFilesIDs({
+        files: [
+          { id: 1, name: 'file one', type: 'image/jpeg', parent: { id: 99 } },
+        ],
+        queuedFiles: {
+          items: [
+            {
+              id: 0,
+              name: 'file uploading',
+              type: 'image/jpeg',
+              parent: { id: 0 },
+              uploadedToFolderId: 99,
+            },
+          ]
+        }
+      })).toEqual([0, 1]);
+    });
+
+    it('upload in progress to root folder', () => {
+      expect(deriveFilesIDs({
+        files: [
+          { id: 1, name: 'file one', type: 'image/jpeg', parent: { id: 99 } },
+        ],
+        queuedFiles: {
+          items: [
+            {
+              id: 0,
+              name: 'file uploading',
+              type: 'image/jpeg',
+              parent: { id: 0 },
+              uploadedToFolderId: 0,
+            },
+          ]
+        },
+        folderId: 0
+      })).toEqual([0, 1]);
+    });
+
+    it('viewing a folder after uploading to a different folder', () => {
+      expect(deriveFilesIDs({
+        files: [
+          { id: 1, name: 'file one', type: 'image/jpeg', parent: { id: 99 } },
+        ],
+        queuedFiles: {
+          items: [
+            {
+              id: 0,
+              name: 'file uploaded',
+              type: 'image/jpeg',
+              parent: { id: 0 },
+              uploadedToFolderId: 77,
+            },
+          ]
+        },
+      })).toEqual([1]);
     });
   });
 });

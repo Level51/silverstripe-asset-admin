@@ -6,7 +6,8 @@ import ReactDOM from 'react-dom';
 import jQuery from 'jquery';
 import ShortcodeSerialiser from 'lib/ShortcodeSerialiser';
 import InsertMediaModal from 'containers/InsertMediaModal/InsertMediaModal';
-import { loadComponent } from 'lib/Injector';
+import Injector, { loadComponent } from 'lib/Injector';
+import * as modalActions from 'state/modal/ModalActions';
 
 const commandName = 'sslinkfile';
 
@@ -17,6 +18,7 @@ TinyMCEActionRegistrar.addAction(
     text: i18n._t('AssetAdmin.LINKLABEL_FILE', 'Link to a file'),
     // eslint-disable-next-line no-console
     onclick: (activeEditor) => activeEditor.execCommand(commandName),
+    priority: 80
   },
   editorIdentifier,
 ).addCommandWithUrlTest(commandName, /^\[file_link/);
@@ -62,7 +64,15 @@ jQuery.entwine('ss', ($) => {
    */
   $(`.js-injector-boot #${modalId}`).entwine({
     renderModal(isOpen) {
-      const handleHide = () => this.close();
+      // We're updating the redux store from outside react. This is a bit unusual, but it's
+      // the best way to initialise our modal setting.
+      const { dispatch } = Injector.reducer.store;
+      dispatch(modalActions.initFormStack('insert-link', 'admin'));
+      const handleHide = () => {
+        dispatch(modalActions.reset());
+        this.close();
+      };
+
       const handleInsert = (...args) => this.handleInsert(...args);
       const attrs = this.getOriginalAttributes();
       const selection = tinymce.activeEditor.selection;

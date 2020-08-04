@@ -87,13 +87,6 @@ class AssetAdmin extends LeftAndMain implements PermissionProvider
 
     /**
      * @config
-     * @see Upload->allowedMaxFileSize
-     * @var int
-     */
-    private static $allowed_max_file_size;
-
-    /**
-     * @config
      *
      * @var int
      */
@@ -102,7 +95,7 @@ class AssetAdmin extends LeftAndMain implements PermissionProvider
     /**
      * @config
      *
-     * @var int The max file size, in megabytes
+     * @var int The max file size, in bytes or INI format
      */
     private static $max_upload_size;
 
@@ -264,7 +257,6 @@ class AssetAdmin extends LeftAndMain implements PermissionProvider
                 'acceptedFiles' => implode(',', array_map(function ($ext) {
                     return $ext[0] != '.' ? ".$ext" : $ext;
                 }, $validator->getAllowedExtensions()))
-
             ]
         ]);
     }
@@ -758,9 +750,10 @@ class AssetAdmin extends LeftAndMain implements PermissionProvider
 
         // Pass to form factory
         $showLinkText = $this->getRequest()->getVar('requireLinkText');
+        $fileSelected = $this->getRequest()->getVar('fileSelected');
         $augmentedContext = array_merge(
             $context,
-            [ 'Record' => $file, 'RequireLinkText' => isset($showLinkText) ]
+            [ 'Record' => $file, 'RequireLinkText' => isset($showLinkText), 'FileSelected' => isset($fileSelected) ]
         );
         $scaffolder = $this->getFormFactory($file);
         $form = $scaffolder->getForm($this, $name, $augmentedContext);
@@ -1162,6 +1155,9 @@ class AssetAdmin extends LeftAndMain implements PermissionProvider
             'published' => ($file->hasMethod('isPublished')) ? $file->isPublished() : true,
             'modified' => ($file->hasMethod('isModifiedOnDraft')) ? $file->isModifiedOnDraft() : false,
             'draft' => ($file->hasMethod('isOnDraftOnly')) ? $file->isOnDraftOnly() : false,
+            'hasRestrictedAccess' => $file->hasRestrictedAccess(),
+            'isTrackedFormUpload' => $file->isTrackedFormUpload(),
+            'visibility' => $file->getVisibility()
         );
 
         /** @var Folder $parent */

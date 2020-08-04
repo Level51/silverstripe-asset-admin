@@ -2,8 +2,11 @@ import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import Griddle from 'griddle-react';
 import i18n from 'i18n';
+import FileStatusIcon from 'components/FileStatusIcon/FileStatusIcon';
 import { galleryViewPropTypes, galleryViewDefaultProps } from 'containers/Gallery/Gallery';
 import { fileSize } from 'lib/DataFormat';
+import { inject } from 'lib/Injector';
+import { compose } from 'redux';
 
 class TableView extends Component {
   constructor(props) {
@@ -15,25 +18,8 @@ class TableView extends Component {
     this.handleRowClick = this.handleRowClick.bind(this);
     this.renderSelect = this.renderSelect.bind(this);
     this.renderTitle = this.renderTitle.bind(this);
+    this.renderStatus = this.renderStatus.bind(this);
     this.renderNoItemsNotice = this.renderNoItemsNotice.bind(this);
-
-    this.state = {
-      // TODO remove `enableSort` state when Griddle is version bumped up from 0.7.0
-      enableSort: false,
-    };
-  }
-
-  componentDidMount() {
-    // eslint-disable-next-line react/no-did-mount-set-state
-    this.setState({
-      enableSort: true,
-    });
-  }
-
-  componentWillUnmount() {
-    this.setState({
-      enableSort: false,
-    });
   }
 
   /**
@@ -45,6 +31,7 @@ class TableView extends Component {
     const columns = [
       'thumbnail',
       'title',
+      'status',
       'size',
       'lastEdited',
     ];
@@ -80,18 +67,26 @@ class TableView extends Component {
       {
         columnName: 'title',
         customCompareFn: () => (0), // Suppress griddle re-sorting
+        displayName: i18n._t('File.TITLE', 'Title'),
         cssClassName: 'gallery__table-column--title',
         customComponent: this.renderTitle,
       },
       {
+        columnName: 'status',
+        sortable: false,
+        cssClassName: 'sort--disabled',
+        customComponent: this.renderStatus,
+        displayName: i18n._t('File.STATUS', 'Status'),
+      },
+      {
         columnName: 'lastEdited',
-        displayName: 'Modified',
+        displayName: i18n._t('File.MODIFIED', 'Modified'),
         customComponent: this.renderDate,
       },
       {
         columnName: 'size',
         sortable: false,
-        displayName: 'Size',
+        displayName: i18n._t('File.SIZE', 'Size'),
         cssClassName: 'sort--disabled',
         customComponent: this.renderSize,
       },
@@ -127,11 +122,7 @@ class TableView extends Component {
       externalCurrentPage: this.props.page - 1,
       externalMaxPage: Math.ceil(this.props.totalCount / this.props.limit),
       externalSortColumn: sortColumn,
-      // TODO change to `sortDirection === 'asc'` when Griddle is version bumped up from 0.7.0
-      // reference: https://github.com/GriddleGriddle/Griddle/pull/515
-      externalSortAscending: (!this.state.enableSort)
-        ? sortDirection !== 'asc'
-        : sortDirection === 'asc',
+      externalSortAscending: sortDirection === 'asc',
       initialSort: sortColumn,
       columns: this.getColumns(),
       columnMetadata: this.getColumnConfig(),
@@ -189,11 +180,7 @@ class TableView extends Component {
   handleSort(column, ascending) {
     const direction = (ascending) ? 'asc' : 'desc';
 
-    // TODO hide while loading or pull request upstream to not setState()
-    // the ad-hoc sorting looks bad
-    if (this.state.enableSort) {
-      this.props.onSort(`${column},${direction}`);
-    }
+    this.props.onSort(`${column},${direction}`);
   }
 
   /**
@@ -246,6 +233,36 @@ class TableView extends Component {
   }
 
   /**
+   * Renders the content for the status column
+   *
+   * @param {object} props
+   * @returns {Component|null}
+   */
+  renderStatus(props) {
+    let flags = [];
+    const item = props.rowData;
+    const { VersionedBadge } = this.props;
+
+    if (item.type !== 'folder') {
+      if (item.draft) {
+        flags.push({
+          key: 'status-draft',
+          status: 'draft'
+        });
+      } else if (item.modified) {
+        flags.push({
+          key: 'status-modified',
+          status: 'modified'
+        });
+      }
+    }
+
+    flags = flags.map(({ ...attributes }) => <VersionedBadge {...attributes} />);
+
+    return flags ? <span>{flags}</span> : null;
+  }
+
+  /**
    * Renders the progressbar for a given row
    *
    * @param rowData
@@ -275,6 +292,35 @@ class TableView extends Component {
   }
 
   /**
+   * @param {Object} rowData
+   * @returns {*}
+   */
+  renderRestrictedAccess(rowData) {
+    const { hasRestrictedAccess } = rowData;
+    const attrs = {
+      fileID: rowData.id,
+      placement: 'top',
+      hasRestrictedAccess
+    };
+    return <FileStatusIcon {...attrs} />;
+  }
+
+  /**
+   * @param {Object} rowData
+   * @returns {*}
+   */
+  renderTrackedFormUpload(rowData) {
+    const { isTrackedFormUpload, hasRestrictedAccess } = rowData;
+    const attrs = {
+      fileID: rowData.id,
+      placement: 'top',
+      isTrackedFormUpload,
+      hasRestrictedAccess
+    };
+    return <FileStatusIcon {...attrs} />;
+  }
+
+  /**
    * Renders the title for the row/item, includes a progress bar if appropriate for uploading
    *
    * @param {object} props
@@ -285,7 +331,11 @@ class TableView extends Component {
 
     return (
       <div className="fill-width">
-        <div className="flexbox-area-grow">{props.data}</div>
+        <div className="flexbox-area-grow">
+          {props.data}
+          {props.rowData.hasRestrictedAccess && this.renderRestrictedAccess(props.rowData)}
+          {props.rowData.isTrackedFormUpload && this.renderTrackedFormUpload(props.rowData)}
+        </div>
         {progress}
       </div>
     );
@@ -378,8 +428,14 @@ TableView.defaultProps = galleryViewDefaultProps;
 TableView.propTypes = {
   ...galleryViewPropTypes,
   sort: PropTypes.string.isRequired,
+  VersionedBadge: PropTypes.oneOfType([PropTypes.node, PropTypes.func])
 };
 
 export { TableView as Component };
 
-export default TableView;
+export default compose(
+  inject(
+    ['VersionedBadge'],
+    VersionedBadge => ({ VersionedBadge })
+  )
+)(TableView);

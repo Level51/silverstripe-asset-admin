@@ -8,6 +8,10 @@ en:
   MoveFormFactory:
     php.SilverStripe\AssetAdmin\Forms\MoveFormFactoryCHOOSEFOLDER: 'Choose a folder'
     php.SilverStripe\AssetAdmin\Forms\MoveFormFactoryMOVE: Move
+  SilverStripe\Admin\FileStatusIcon:
+    ACCESS_RESTRICTED: 'Restricted access'
+    TRACKED_FORM_UPLOAD_RESTRICTED: 'Form submission'
+    TRACKED_FORM_UPLOAD_UNRESTRICTED: 'Form submission, unrestricted access'
   SilverStripe\AssetAdmin\BatchAction\DeleteAssets:
     TITLE: 'Delete folders'
   SilverStripe\AssetAdmin\Controller\AssetAdmin:
@@ -19,7 +23,7 @@ en:
     AlignmentRight: 'Right wrap'
     AlignmentRightAlone: Right
     AltText: 'Alternative text (alt)'
-    AltTextDescription: 'Shown to screen readers or if image can''t be displayed'
+    AltTextTip: 'Description for visitors who are unable to view the image (using screenreaders or image blockers). Recommended for images which provide unique context to the content.'
     AppCategoryArchive: Archive
     AppCategoryAudio: Audio
     AppCategoryDocument: Document
@@ -31,7 +35,6 @@ en:
     CreatePermissionDenied: 'You do not have permission to add files'
     CurrentFolderOnly: 'Limit to current folder and its sub-folders?'
     DELETE_BUTTON: Delete
-    EditLink: 'Edit original file'
     ErrorItemPermissionDenied: 'You don''t have the necessary permissions to modify {ObjectTitle}'
     ErrorNotFound: 'That {Type} couldn''t be found'
     FILE_NOT_FOUND: 'File not found'
@@ -51,7 +54,7 @@ en:
     Placement: Placement
     SAVEDFILE: 'Saved file'
     TitleTooltip: 'Title text (tooltip)'
-    TitleTooltipDescription: 'For additional information about the image'
+    TitleTooltipTip: 'Provides a long form explanation if required. Shown on hover.'
     UNKNOWN: Unknown
     UNPUBLISH_BUTTON: Unpublish
     UPLOADEDFILE: 'Uploaded file'
@@ -73,6 +76,7 @@ en:
     SAVE: Save
     VIEWERGROUPS: 'Viewer Groups'
   SilverStripe\AssetAdmin\Forms\FileFormFactory:
+    DOWNLOAD_FILE: 'Download file'
     INSERT_FILE: Insert
     INSERT_LINK: 'Link to file'
     LINKDESCR: 'Link description'

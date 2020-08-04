@@ -11,6 +11,8 @@ import { getFileExtension } from 'lib/DataFormat';
 import getFormState from 'lib/getFormState';
 import classnames from 'classnames';
 import PropTypes from 'prop-types';
+import urlLib from 'url';
+import qs from 'qs';
 
 class PreviewImageField extends Component {
   constructor(props) {
@@ -234,6 +236,19 @@ class PreviewImageField extends Component {
     if (url) return url;
 
     return null;
+  }
+
+  /**
+   * Append a vid parameter to the URL to bust the cache
+   * @param {string} url
+   * @param {string} versionId
+   * @return string
+   */
+  cacheBustUrl(url, versionId) {
+    const parsedUrl = urlLib.parse(url);
+    const parsedQs = qs.parse(parsedUrl.query);
+    parsedQs.vid = versionId;
+    return urlLib.format({ ...parsedUrl, search: qs.stringify(parsedQs) });
   }
 
   /**

@@ -80,11 +80,12 @@ class AssetDropzone extends Component {
 
   componentWillUnmount() {
     // Remove all dropzone event listeners.
+    this.dropzone.files = [];
     this.dropzone.destroy();
   }
 
   /**
-   * Gets the default optiions to instanciate dropzone with.
+   * Gets the default options to instantiate dropzone with.
    *
    * @return object
    */
@@ -412,6 +413,7 @@ class AssetDropzone extends Component {
       title: this.getFileTitle(file.name),
       extension: getFileExtension(file.name),
       type: file.type,
+      uploadedToFolderId: this.props.folderId,
     };
     // Add the file optimistically.
     this.props.onAddedFile(details);

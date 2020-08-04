@@ -13,6 +13,8 @@ const fileInterface = `
     title
     type
     url
+    visibility
+    hasRestrictedAccess
   }
 `;
 
@@ -25,15 +27,9 @@ const file = `
     size
     smallThumbnail
     thumbnail
-    inUseCount
     version
+    isTrackedFormUpload
   }
 `;
 
-const folder = `
-  fragment FolderFields on Folder {
-    filesInUseCount
-  }
-`;
-
-export { fileInterface, file, folder };
+export { fileInterface, file };

@@ -6,6 +6,7 @@ import fileShape from 'lib/fileShape';
 import draggable from 'components/GalleryItem/draggable';
 import droppable from 'components/GalleryItem/droppable';
 import Badge from 'components/Badge/Badge';
+import FileStatusIcon from 'components/FileStatusIcon/FileStatusIcon';
 import configShape from 'lib/configShape';
 import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
@@ -168,7 +169,7 @@ class GalleryItem extends Component {
       'gallery-item--error': this.hasError(),
       'gallery-item--dragging': this.props.isDragging,
     });
-    }
+  }
 
   /**
    * Gets a function that may be overloaded at the item level
@@ -176,17 +177,17 @@ class GalleryItem extends Component {
    * @returns {Function}
    */
   getItemFunction(functionName) {
-      const { item } = this.props;
+    const { item } = this.props;
 
-      return (typeof item[functionName] === 'function')
-        ? item[functionName]
-        : this.props[functionName];
-    }
+    return (typeof item[functionName] === 'function')
+      ? item[functionName]
+      : this.props[functionName];
+  }
 
   /**
    * Get flags for statuses that apply to this item
    *
-   * @returns {Array}
+   * @returns {*}
    */
   getStatusFlags() {
     let flags = [];
@@ -194,14 +195,12 @@ class GalleryItem extends Component {
     if (item.type !== 'folder') {
       if (item.draft) {
         flags.push({
-          node: 'span',
           key: 'status-draft',
           title: i18n._t('File.DRAFT', 'Draft'),
           className: 'gallery-item--draft',
         });
       } else if (item.modified) {
         flags.push({
-          node: 'span',
           key: 'status-modified',
           title: i18n._t('File.MODIFIED', 'Modified'),
           className: 'gallery-item--modified',
@@ -210,7 +209,46 @@ class GalleryItem extends Component {
     }
     const updateStatusFlags = this.getItemFunction('updateStatusFlags');
     flags = updateStatusFlags(flags, this.props);
-    return flags.map(({ node: Tag, ...attributes }) => <Tag {...attributes} />);
+    return (
+      <div className="gallery-item__status-flags">
+        {flags.map(attrs => <span {...attrs} />)}
+      </div>
+    );
+  }
+
+  /**
+   * Get flags for statuses that apply to this item
+   *
+   * @returns {*}
+   */
+  getStatusIcons() {
+    const { item } = this.props;
+    const icons = [];
+    if (item.hasRestrictedAccess) {
+      icons.push({
+        key: 'status-restricted',
+        fileID: item.id,
+        hasRestrictedAccess: true,
+        placement: 'top',
+        disableTooltip: item.type === 'folder',
+        includeBackground: item.type !== 'folder',
+      });
+    }
+    if (item.isTrackedFormUpload && item.type !== 'folder') {
+      icons.push({
+        key: 'status-tracked-form-upload',
+        fileID: item.id,
+        isTrackedFormUpload: true,
+        hasRestrictedAccess: item.hasRestrictedAccess,
+        placement: 'top',
+        includeBackground: true,
+      });
+    }
+    return (
+      <div className="gallery-item__status-icons">
+        {icons.map(attrs => <FileStatusIcon {...attrs} />)}
+      </div>
+    );
   }
 
   /**
@@ -419,8 +457,8 @@ class GalleryItem extends Component {
       action = this.handleCancelUpload;
       actionIcon = 'font-icon-cancel';
     } else if (this.exists()) {
-      const label = i18n._t('AssetAdmin.DETAILS', 'Details');
-      overlay = <div className="gallery-item--overlay font-icon-edit">{label}</div>;
+      const label = i18n._t('AssetAdmin.VIEW', 'View');
+      overlay = <div className="gallery-item--overlay font-icon-eye">{label}</div>;
     }
 
     const badge = this.props.badge;
@@ -463,17 +501,23 @@ class GalleryItem extends Component {
         />
         }
         <div
-          ref={(thumbnail) => { this.thumbnail = thumbnail; }}
+          ref={(thumbnail) => {
+            this.thumbnail = thumbnail;
+          }}
           className={this.getThumbnailClassNames()}
           style={this.getThumbnailStyles()}
         >
           {overlay}
           {this.getStatusFlags()}
+          {this.getStatusIcons()}
         </div>
         {this.getProgressBar()}
         {this.getErrorMessage()}
         {this.props.children}
-        <div className="gallery-item__title" ref={(title) => { this.title = title; }}>
+        <div
+          className="gallery-item__title"
+          ref={(title) => { this.title = title; }}
+        >
           <label {...inputLabelProps} htmlFor={htmlID}>
             <input {...inputProps} />
           </label>

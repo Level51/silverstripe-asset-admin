@@ -10,6 +10,7 @@ use SilverStripe\Forms\DatetimeField;
 use SilverStripe\Forms\FieldGroup;
 use SilverStripe\Forms\FieldList;
 use SilverStripe\Forms\FormAction;
+use SilverStripe\Forms\HeaderField;
 use SilverStripe\Forms\HiddenField;
 use SilverStripe\Forms\LiteralField;
 use SilverStripe\Forms\Tab;
@@ -20,6 +21,7 @@ use SilverStripe\Versioned\Versioned;
 
 class FileFormFactory extends AssetFormFactory
 {
+
     /**
      * History tab/form to be shown to the user or not
      *
@@ -35,17 +37,7 @@ class FileFormFactory extends AssetFormFactory
     protected function getFormFieldTabs($record, $context = [])
     {
         // Add extra tab
-        $tabs = TabSet::create(
-            'Editor',
-            $this->getFormFieldDetailsTab($record, $context),
-            $this->getFormFieldSecurityTab($record, $context),
-            $this->getFormFieldUsageTab($record, $context)
-        );
-
-        if ($this->config()->get('show_history')) {
-            $tabs->push($this->getFormFieldHistoryTab($record, $context));
-        }
-
+        $tabs = TabSet::create('Editor');
         $type = $this->getFormType($context);
 
         // Unsupported media insertion will use insert link form instead
@@ -55,18 +47,27 @@ class FileFormFactory extends AssetFormFactory
             }
         }
 
-        // All non-admin forms are typically readonly
         switch ($type) {
             case static::TYPE_INSERT_MEDIA:
-                $tabs->setReadonly(true);
                 $tabs->unshift($this->getFormFieldAttributesTab($record, $context));
                 break;
             case static::TYPE_INSERT_LINK:
-                $tabs->setReadonly(true);
                 $tabs->unshift($this->getFormFieldLinkOptionsTab($record, $context));
                 break;
             case static::TYPE_SELECT:
-                $tabs->setReadonly(true);
+            default:
+                $tabs->push($this->getFormFieldDetailsTab($record, $context));
+                $tabs->push($this->getFormFieldSecurityTab($record, $context));
+                $tabs->push($this->getFormFieldUsageTab($record, $context));
+
+                if ($this->config()->get('show_history')) {
+                    $tabs->push($this->getFormFieldHistoryTab($record, $context));
+                }
+
+                if ($type === static::TYPE_SELECT) {
+                    $tabs->setReadonly(true);
+                }
+
                 break;
         }
 
@@ -99,18 +100,7 @@ class FileFormFactory extends AssetFormFactory
             )
                 ->setReadonly(true)
         );
-        if ($this->getFormType($context) !== static::TYPE_ADMIN) {
-            $tab->push(LiteralField::create(
-                'EditLink',
-                sprintf(
-                    '<a href="%s" class="%s" target="_blank"><i class="%s" />%s</a>',
-                    $record->CMSEditLink(),
-                    'btn btn-outline-secondary font-icon-edit editor__edit-link',
-                    '',
-                    _t('SilverStripe\\AssetAdmin\\Controller\\AssetAdmin.EditLink', 'Edit original file')
-                )
-            ));
-        }
+
         return $tab;
     }
 
@@ -170,6 +160,10 @@ class FileFormFactory extends AssetFormFactory
     {
         return Tab::create(
             'Placement',
+            HeaderField::create(_t(
+                'SilverStripe\\AssetAdmin\\Controller\\AssetAdmin.Placement',
+                'Placement'
+            )),
             LiteralField::create(
                 'AttributesDescription',
                 '<p>' . _t(
@@ -276,13 +270,19 @@ class FileFormFactory extends AssetFormFactory
     protected function getFormActions(RequestHandler $controller = null, $formName, $context = [])
     {
         $record = $context['Record'];
+        $fileSelected = $context['FileSelected'] ?? false;
         $type = $this->getFormType($context);
 
         $actionItems = [];
         if ($type === static::TYPE_INSERT_MEDIA || $type === static::TYPE_SELECT) {
-            $actionItems = array_filter([
-                $this->getInsertAction($record),
-            ]);
+            $action = $this->getInsertAction($record);
+            if ($action) {
+                $actionLabel = $fileSelected
+                    ? _t('AssetAdmin.UPDATE_FILE', 'Update file')
+                    : _t('AssetAdmin.INSERT_FILE', 'Insert file');
+                $action->setTitle($actionLabel);
+                $actionItems[] = $action;
+            }
         } elseif ($type === static::TYPE_INSERT_LINK) {
             $actionItems = array_filter([
                 $this->getInsertLinkAction($record),
@@ -345,10 +345,34 @@ class FileFormFactory extends AssetFormFactory
      */
     protected function getStatusFlagMarkup($record)
     {
-        if ($record && ($statusTitle = $record->getStatusTitle())) {
-            return "<span class=\"editor__status-flag\">{$statusTitle}</span>";
+        if (is_null($record)) {
+            return null;
         }
-        return null;
+
+        $html = '';
+        $hasRestrictedAccess = $record->hasRestrictedAccess();
+
+        if ($hasRestrictedAccess) {
+            $title = _t('SilverStripe\\Admin\\FileStatusIcon.ACCESS_RESTRICTED', 'Restricted access');
+            $html .= $this->buildFileStatusIcon($title, 'font-icon-user-lock');
+        }
+
+        if ($record->isTrackedFormUpload()) {
+            $title = $hasRestrictedAccess
+                ? _t('SilverStripe\\Admin\\FileStatusIcon.TRACKED_FORM_UPLOAD_RESTRICTED', 'Form submission')
+                : _t(
+                    'SilverStripe\\Admin\\FileStatusIcon.TRACKED_FORM_UPLOAD_UNRESTRICTED',
+                    'Form submission, unrestricted access'
+                );
+            $fontClass = $hasRestrictedAccess ? 'font-icon-address-card' : 'font-icon-address-card-warning';
+            $html .= $this->buildFileStatusIcon($title, $fontClass);
+        }
+
+        if ($statusTitle = $record->getStatusTitle()) {
+            $html .= sprintf('<span class="editor__status-flag">%s</span>', $statusTitle);
+        }
+
+        return $html;
     }
 
     /**
@@ -401,6 +425,25 @@ class FileFormFactory extends AssetFormFactory
     }
 
     /**
+     * Get Download file action
+     *
+     * @param File $record
+     * @return FormAction
+     */
+    protected function getDownloadFileAction($record)
+    {
+        // Check if record exists and user has correct permissions
+        if (!$record || !$record->isInDB() || !$record->canEdit()) {
+            return null;
+        }
+
+        $action = FormAction::create('downloadfile', _t(__CLASS__ . '.DOWNLOAD_FILE', 'Download file'))
+            ->setIcon('down-circled');
+
+        return $action;
+    }
+
+    /**
      * Get actions that go into the Popover menu
      *
      * @param $record
@@ -411,6 +454,7 @@ class FileFormFactory extends AssetFormFactory
         $this->beforeExtending('updatePopoverActions', function (&$actions, $record) {
             // add the unpublish and replace file actions to the start of the array
             array_unshift($actions, $this->getUnpublishAction($record));
+            array_unshift($actions, $this->getDownloadFileAction($record));
             array_unshift($actions, $this->getReplaceFileAction($record));
         });
 
@@ -426,7 +470,7 @@ class FileFormFactory extends AssetFormFactory
         $action = null;
         if ($record && $record->isInDB() && $record->canView()) {
             /** @var FormAction $action */
-            $action = FormAction::create('insert', _t(__CLASS__ . '.INSERT_FILE', 'Insert'))
+            $action = FormAction::create('insert', 'Insert')
                 ->setIcon('plus-circled')
                 ->setSchemaData(['data' => ['buttonStyle' => 'primary']]);
         }

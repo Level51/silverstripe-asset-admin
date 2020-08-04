@@ -9,6 +9,7 @@ use SilverStripe\Control\RequestHandler;
 use SilverStripe\Core\Config\Configurable;
 use SilverStripe\Core\Extensible;
 use SilverStripe\Core\Injector\Injectable;
+use SilverStripe\Forms\FieldGroup;
 use SilverStripe\Forms\FieldList;
 use SilverStripe\Forms\Form;
 use SilverStripe\Forms\FormAction;
@@ -223,8 +224,10 @@ abstract class AssetFormFactory implements FormFactory
         // Build standard fields for all folders / files
         /** @var File $record */
         $fields = new FieldList(
-            HeaderField::create('TitleHeader', $record ? $record->Title : null, 1)
-                ->addExtraClass('editor__heading'),
+            FieldGroup::create(
+                HeaderField::create('TitleHeader', $record ? $record->Title : null, 1)
+                    ->addExtraClass('editor__heading')
+            )->setName('AssetEditorHeaderFieldGroup'),
             $this->getFormFieldTabs($record, $context)
         );
         if ($record) {
@@ -237,7 +240,7 @@ abstract class AssetFormFactory implements FormFactory
             }
 
             $fields->push(HiddenField::create('ID', $record->ID));
-            $fields->insertAfter('TitleHeader', $previewField);
+            $fields->insertAfter('AssetEditorHeaderFieldGroup', $previewField);
         }
 
         $this->invokeWithExtensions('updateFormFields', $fields, $controller, $formName, $context);
@@ -385,5 +388,28 @@ abstract class AssetFormFactory implements FormFactory
     public function getRequiredContext()
     {
         return ['Record'];
+    }
+
+    /**
+     * @param string $title
+     * @param string $fontClass
+     * @return string
+     */
+    protected function buildFileStatusIcon(string $title, string $fontClass): string
+    {
+        // https://getbootstrap.com/docs/4.4/components/tooltips/
+        // Specifying data-delay as an html attribute means that show and hide must be the same value unfortunately
+        // Cannot data-delay="{show: 300, hide: 0}" as it will be interpreted as a string, not (number|object)
+        return <<<EOT
+            <div class="file-status-icon">
+                <span title="$title"
+                      class="icon file-status-icon__icon $fontClass"
+                      data-toggle="tooltip"
+                      data-placement="top"
+                      data-delay="150"
+                      data-animation="false">
+                </span>
+            </div>
+EOT;
     }
 }

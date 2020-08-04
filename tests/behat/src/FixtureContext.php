@@ -108,6 +108,30 @@ class FixtureContext extends BaseFixtureContext
     }
 
     /**
+     * @Then /^I should see a file status icon with the class "([^"]*)"/
+     * @param string $id HTML ID of form
+     */
+    public function iShouldSeeTheFileStatusIconWithTheClass($class)
+    {
+        $js = "window.jQuery && window.jQuery('.file-status-icon__icon').size() > 0";
+        $this->getMainContext()->getSession()->wait(1000, $js);
+        $icon = $this->getMainContext()->getSession()->getPage()->find('css', "{$class}.file-status-icon__icon");
+        assertNotNull($icon, "File status icon '$class' could not be found");
+        assertTrue($icon->isVisible(), "File status icon '$class' is not visible");
+    }
+
+    /**
+     * @Then /^I should not see a file status icon with the class "([^"]*)"/
+     * @param string $id HTML ID of form
+     */
+    public function iShouldNotSeeTheFileStatusIconWithTheClass($id)
+    {
+        $this->getMainContext()->getSession()->wait(2500);
+        $icon = $this->getMainContext()->getSession()->getPage()->find('css', "{$id}.file-status-icon");
+        assertNull($icon, "File status icon '$id' was found");
+    }
+
+    /**
      * @Given /^I click on the latest history item$/
      */
     public function iClickOnTheLatestHistoryItem()
@@ -293,6 +317,24 @@ EOS
     }
 
     /**
+     * @Then I press the :buttonName button inside the modal
+     * @param string $buttonName
+     */
+    public function iPressButtonInModal($buttonName)
+    {
+        $page = $this->getMainContext()->getSession()->getPage();
+        $modal = $page->find('css', '[role=dialog] .modal-dialog');
+        assertNotNull($modal, 'No modal on the page');
+
+        // Check if the popover is open for the block
+        $button = $modal->find('xpath', "//button[contains(text(), '$buttonName')]");
+
+        assertNotNull($button, sprintf('Could not find button labelled "%s"', $buttonName));
+
+        $button->click();
+    }
+
+    /**
      * @Then /^I should see the gallery item "([^"]+)" in position "([^"]+)"$/
      * @param string $name
      * @param string $position
@@ -321,5 +363,63 @@ EOS
         assertNotNull($element, sprintf('Element %s not found', $selector));
 
         $element->click();
+    }
+
+    /**
+     * Selects the first image match in the HTML editor (tinymce)
+     *
+     * @When /^I select the image "([^"]+)" in the "([^"]+)" HTML field$/
+     * @param string $filename
+     * @param string $field
+     */
+    public function iSelectTheImageInHtmlField($filename, $field)
+    {
+        $inputField = $this->getHtmlField($field);
+        $inputFieldId = $inputField->getAttribute('id');
+        $filename = addcslashes($filename, "'");
+        $js = <<<JS
+var editor = jQuery('#$inputFieldId').entwine('ss').getEditor(),
+	doc = editor.getInstance().getDoc(),
+	sel = editor.getInstance().selection,
+	rng = document.createRange(),
+	matched = false;
+
+editor.getInstance().focus();
+jQuery(doc).find("img[src*='$filename']").each(function() {
+	if(!matched) {
+		rng.setStart(this, 0);
+		rng.setEnd(this, 0);
+		sel.setRng(rng);
+		editor.getInstance().nodeChanged();
+		matched = true;
+	}
+});
+JS;
+        $this->getMainContext()->getSession()->executeScript($js);
+    }
+
+    /**
+     * Locate an HTML editor field
+     *
+     * @param string $locator Raw html field identifier as passed from
+     * @return NodeElement
+     */
+    protected function getHtmlField($locator)
+    {
+        $locator = str_replace('\\"', '"', $locator);
+        $page = $this->getMainContext()->getSession()->getPage();
+        $element = $page->find('css', 'textarea.htmleditor[name=\'' . $locator . '\']');
+        if ($element) {
+            return $element;
+        }
+        $label = $page->findAll('xpath', sprintf('//label[contains(text(), \'%s\')]', $locator));
+        if (!empty($label)) {
+            assertCount(1, $label, "Found more than one element containing the phrase \"$locator\"");
+            $label = array_shift($label);
+            $fieldId = $label->getAttribute('for');
+            $element = $page->find('css', '#' . $fieldId);
+        }
+        assertNotNull($element, sprintf('HTML field "%s" not found', $locator));
+        return $element;
     }
 }

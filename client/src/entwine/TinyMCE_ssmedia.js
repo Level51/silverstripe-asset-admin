@@ -8,9 +8,11 @@ import jQuery from 'jquery';
 import i18n from 'i18n';
 import React from 'react';
 import ReactDOM from 'react-dom';
-import { loadComponent } from 'lib/Injector';
+import Injector, { loadComponent } from 'lib/Injector';
 import InsertMediaModal from 'containers/InsertMediaModal/InsertMediaModal';
 import ShortcodeSerialiser, { sanitiseShortCodeProperties } from 'lib/ShortcodeSerialiser';
+import { imageSizePresetButtons } from './TinyMCE_ssmedia_sizepressets';
+import * as modalActions from 'state/modal/ModalActions';
 
 const InjectableInsertMediaModal = loadComponent(InsertMediaModal);
 
@@ -22,7 +24,7 @@ const filter = 'img[data-shortcode="image"]';
     /**
      * Initilise this plugin
      *
-     * @param {Object} ed
+     * @param {Object} ed TinyMCE editor object
      */
     init(ed) {
       const insertTitle = i18n._t('AssetAdmin.INSERT_FROM_FILES', 'Insert from Files');
@@ -44,9 +46,16 @@ const filter = 'img[data-shortcode="image"]';
         icon: 'editimage',
         cmd: 'ssmedia'
       });
+
+      const sizePresets = ed.getParam('image_size_presets');
+      let buttonList = [];
+      if (sizePresets) {
+        buttonList = imageSizePresetButtons(ed, sizePresets);
+      }
+
       ed.addContextToolbar(
         (img) => ed.dom.is(img, filter),
-        'alignleft aligncenter alignright | ssmediaedit'
+        `${buttonList.join(' ')} | ssmediaedit`
       );
 
       ed.addCommand('ssmedia', () => {
@@ -88,7 +97,7 @@ const filter = 'img[data-shortcode="image"]';
             const shortCode = ShortcodeSerialiser.serialise({
               name: 'image',
               properties,
-              wrapped: false
+              wrapped: false,
             });
             el.replaceWith(shortCode);
           });
@@ -156,10 +165,19 @@ jQuery.entwine('ss', ($) => {
     },
 
     open() {
+      // We're updating the redux store from outside react. This is a bit unusual, but it's
+      // the best way to initialise our modal setting.
+      const { dispatch } = Injector.reducer.store;
+      dispatch(modalActions.initFormStack('insert-media', 'admin'));
+      const imageSizePresets = tinymce.activeEditor.getParam('image_size_presets');
+      dispatch(modalActions.defineImageSizePresets(imageSizePresets));
       this._renderModal(true);
     },
 
     close() {
+      // When closing down the modal, let's reset our modal redux state
+      const { dispatch } = Injector.reducer.store;
+      dispatch(modalActions.reset());
       this._renderModal(false);
     },
 
@@ -172,7 +190,9 @@ jQuery.entwine('ss', ($) => {
     _renderModal(isOpen) {
       const handleHide = () => this.close();
       const handleInsert = (...args) => this._handleInsert(...args);
-      const attrs = this.getOriginalAttributes();
+      const { url, ...attrs } = this.getOriginalAttributes();
+      const fileSelected = attrs.hasOwnProperty('ID') && attrs.ID !== null;
+      const folderId = this.getFolderId();
       const selection = tinymce.activeEditor.selection;
       const selectionContent = selection.getContent() || '';
       const tagName = selection.getNode().tagName;
@@ -180,20 +200,19 @@ jQuery.entwine('ss', ($) => {
       // treat image tag selection as blank content
       const requireLinkText = tagName !== 'A' && (tagName === 'IMG' || selectionContent.trim() === '');
 
-      delete attrs.url;
-
       // create/update the react component
       ReactDOM.render(
         <InjectableInsertMediaModal
           title={false}
-          type="insert-media"
           isOpen={isOpen}
+          folderId={folderId}
           onInsert={handleInsert}
           onClosed={handleHide}
           bodyClassName="modal__dialog"
           className="insert-media-react__dialog-wrapper"
           requireLinkText={requireLinkText}
           fileAttributes={attrs}
+          fileSelected={fileSelected}
         />,
         this[0]
       );
@@ -237,6 +256,22 @@ jQuery.entwine('ss', ($) => {
         this.close();
       }
       return Promise.resolve();
+    },
+
+    /**
+     * Get default upload folder
+     *
+     * @returns {(number|null)}
+     */
+    getFolderId() {
+      const $field = this.getElement();
+      if (!$field) {
+        return null;
+      }
+
+      // Check type safely
+      const folderId = Number($field.data('config').upload_folder_id);
+      return isNaN(folderId) ? null : folderId;
     },
 
     /**

@@ -19,7 +19,6 @@ da:
     AlignmentRight: 'Højre med ombrydning'
     AlignmentRightAlone: Højre
     AltText: 'Alternativ tekst (alt)'
-    AltTextDescription: 'Vises til skærmlæsere hvis billedet ikke kan vises'
     AppCategoryArchive: Arkiv
     AppCategoryAudio: Lyd
     AppCategoryDocument: Dokument
@@ -31,7 +30,6 @@ da:
     CreatePermissionDenied: 'Du har ikke tilladelse til at tilføje filer'
     CurrentFolderOnly: 'Begræns til nuværende mappe og dens undermapper?'
     DELETE_BUTTON: Slet
-    EditLink: 'Rediger original fil'
     ErrorItemPermissionDenied: 'Du har ikke de nødvendige tilladelser til at administrere {ObjectTitle}'
     ErrorNotFound: 'Typen {Type} kunne ikke findes'
     FILE_NOT_FOUND: 'Filen kunne ikke findes'
@@ -51,7 +49,6 @@ da:
     Placement: Placering
     SAVEDFILE: 'Gemte fil'
     TitleTooltip: 'Titel tekst (tooltip)'
-    TitleTooltipDescription: 'For yderligere information om billedet'
     UNKNOWN: Ukendt
     UNPUBLISH_BUTTON: 'Fjern udgivelse'
     UPLOADEDFILE: 'Overførte fil'
