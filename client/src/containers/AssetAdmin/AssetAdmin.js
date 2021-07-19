@@ -7,6 +7,7 @@ import backend from 'lib/Backend';
 import i18n from 'i18n';
 import classnames from 'classnames';
 import * as galleryActions from 'state/gallery/GalleryActions';
+import * as toastsActions from 'state/toasts/ToastsActions';
 import * as queuedFilesActions from 'state/queuedFiles/QueuedFilesActions';
 import * as displaySearchActions from 'state/displaySearch/DisplaySearchActions';
 import Editor from 'containers/Editor/Editor';
@@ -357,7 +358,7 @@ class AssetAdmin extends Component {
       .then((resultItems) => {
         const successes = resultItems.filter((result) => result).length;
         if (successes !== ids.length) {
-          this.props.actions.gallery.setErrorMessage(
+          this.props.actions.toasts.error(
             i18n.sprintf(
               i18n._t(
                 'AssetAdmin.BULK_ACTIONS_DELETE_FAIL',
@@ -367,15 +368,13 @@ class AssetAdmin extends Component {
               ids.length - successes
             )
           );
-          this.props.actions.gallery.setNoticeMessage(null);
         } else {
-          this.props.actions.gallery.setNoticeMessage(
+          this.props.actions.toasts.success(
             i18n.sprintf(
               i18n._t('AssetAdmin.BULK_ACTIONS_DELETE_SUCCESS', '%s folders/files were successfully deleted.'),
               successes
             )
           );
-          this.props.actions.gallery.setErrorMessage(null);
           this.props.actions.gallery.deselectFiles();
         }
 
@@ -409,7 +408,7 @@ class AssetAdmin extends Component {
       .then(({ data: { unpublishFiles } }) => {
         const successes = unpublishFiles.filter(result => result.__typename === 'File');
         const confirmationRequired = unpublishFiles.filter(result => (
-          result.__typename === 'PublicationNotice' && result.Type === 'HAS_OWNERS'
+          result.__typename === 'PublicationNotice' && result.noticeType === 'HAS_OWNERS'
         ));
         const successful = successes.map(file => {
           this.resetFile(file);
@@ -417,7 +416,7 @@ class AssetAdmin extends Component {
         });
         const displayedMessages = confirmationRequired.slice(0, 4);
         const rest = confirmationRequired.slice(5);
-        const body = displayedMessages.map(warning => warning.Message);
+        const body = displayedMessages.map(warning => warning.message);
         if (rest.length) {
           body.push(
             i18n.inject(
@@ -450,7 +449,7 @@ class AssetAdmin extends Component {
           // eslint-disable-next-line no-alert
           if (confirm(alertMessage.join('\n\n'))) {
             const secondPassIDs = confirmationRequired.reduce(
-              (acc, curr) => acc.concat(curr.IDs),
+              (acc, curr) => acc.concat(curr.ids),
               []
             );
             return this.doUnpublish(secondPassIDs, true)
@@ -675,11 +674,11 @@ class AssetAdmin extends Component {
   }
 
   render() {
-    const { folder, folderId, query, getUrl, type, maxFiles, filter, toolbarChildren } = this.props;
+    const { folder, folderId, query, getUrl, type, maxFiles, toolbarChildren } = this.props;
 
     const showBackButton = Boolean(folderId || hasFilters(query.filter));
     const searchFormSchemaUrl = this.props.sectionConfig.form.fileSearchForm.schemaUrl;
-    const filters = filter || {};
+    const filters = query.filter || {};
     const classNames = classnames(
       'fill-height asset-admin',
       type === 'select' && {
@@ -687,7 +686,7 @@ class AssetAdmin extends Component {
         'asset-admin--multi-select': maxFiles !== 1,
       }
     );
-    const showSearch = hasFilters(filter) || this.props.showSearch;
+    const showSearch = hasFilters(query.filter) || this.props.showSearch;
     const onSearchToggle = this.props.actions.displaySearch ?
       this.props.actions.displaySearch.toggleSearch :
       undefined;
@@ -794,6 +793,7 @@ function mapDispatchToProps(dispatch) {
   return {
     actions: {
       gallery: bindActionCreators(galleryActions, dispatch),
+      toasts: bindActionCreators(toastsActions, dispatch),
       displaySearch: bindActionCreators(displaySearchActions, dispatch),
       // TODO Refactor "queued files" into separate visual area and remove coupling here
       queuedFiles: bindActionCreators(queuedFilesActions, dispatch),

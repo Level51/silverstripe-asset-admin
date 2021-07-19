@@ -1,3 +1,4 @@
+/* global moment */
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import Griddle from 'griddle-react';
@@ -110,6 +111,7 @@ class TableView extends Component {
       gridClassName: 'gallery__main-view--table',
       rowMetadata: {
         bodyCssClassName: this.getRowMetadata,
+        key: 'key'
       },
       sortAscendingComponent: '',
       sortDescendingComponent: '',
@@ -332,7 +334,7 @@ class TableView extends Component {
     return (
       <div className="fill-width">
         <div className="flexbox-area-grow">
-          {props.data}
+          <span>{props.data}</span>
           {props.rowData.hasRestrictedAccess && this.renderRestrictedAccess(props.rowData)}
           {props.rowData.isTrackedFormUpload && this.renderTrackedFormUpload(props.rowData)}
         </div>
@@ -382,8 +384,9 @@ class TableView extends Component {
     if (props.rowData.type === 'folder') {
       return null;
     }
-    // TODO format this properly with something like moment.js
-    return <span>{props.data}</span>;
+
+    moment.locale(i18n.detectLocale());
+    return <span>{ moment(props.data).format('L LT') }</span>;
   }
 
   /**

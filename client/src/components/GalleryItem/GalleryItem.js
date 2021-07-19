@@ -66,10 +66,15 @@ class GalleryItem extends Component {
    */
   getThumbnailStyles() {
     // Don't fall back to this.props.item.url since it might be huge
-    const { thumbnail, version } = this.props.item;
+    const { item: { thumbnail, version }, bustCache } = this.props;
     if (!this.isImage() || !thumbnail || this.missing()) {
       return {};
     }
+
+    // When the thumbnail is a link, add version id to bust the cache
+    const url = (bustCache === false || !version || thumbnail.startsWith('data:image/')) ?
+      thumbnail :
+      `${thumbnail}?vid=${version}`;
 
     // Check loading status of thumbnail
     switch (this.props.loadState) {
@@ -532,6 +537,7 @@ GalleryItem.propTypes = {
   sectionConfig: configShape,
   item: fileShape,
   loadState: PropTypes.oneOf(Object.values(IMAGE_STATUS)),
+  bustCache: PropTypes.bool,
   // Can be used to highlight a currently edited file
   highlighted: PropTypes.bool,
   // Styles according to the checkbox selection state
@@ -565,9 +571,16 @@ GalleryItem.defaultProps = {
   updateStatusFlags: flags => flags,
   updateProgressBar: progressBar => progressBar,
   updateErrorMessage: message => message,
+  bustCache: true,
 };
 
 function mapStateToProps(state, ownprops) {
+  const sectionConfigKey = 'SilverStripe\\AssetAdmin\\Controller\\AssetAdmin';
+  const { bustCache } = state.config.sections.find((section) => section.name === sectionConfigKey);
+
+  // None implies disabled preloading
+  let loadState = IMAGE_STATUS.DISABLED;
+
   // If image is broken, replace with placeholder
   if (shouldLoadImage(ownprops)) {
     // Find state of this file
@@ -575,11 +588,10 @@ function mapStateToProps(state, ownprops) {
     const file = imageLoad.files.find((next) => ownprops.item.thumbnail === next.url);
 
     // Use file state, or mark none prior to loadFile being called
-    const loadState = (file && file.status) || IMAGE_STATUS.NONE;
-    return { loadState };
+    loadState = (file && file.status) || IMAGE_STATUS.NONE;
   }
-  // None implies disabled preloading
-  return { loadState: IMAGE_STATUS.DISABLED };
+
+  return { bustCache, loadState };
 }
 
 function mapDispatchToProps(dispatch) {

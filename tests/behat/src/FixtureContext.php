@@ -240,7 +240,7 @@ EOS
         // Find by row
         $row = $page->find(
             'xpath',
-            "//tr[contains(@class, 'gallery__table-row')]//div[contains(text(), '{$name}')]"
+            "//tr[contains(@class, 'gallery__table-row')]//div//span[contains(text(), '{$name}')]"
         );
         if ($row) {
             return $row;
@@ -346,23 +346,11 @@ EOS
         $title = $itemByPosition->find(
             'xpath',
             "//div[contains(text(), '{$name}')]"
+        ) ?: $itemByPosition->find(
+            'xpath',
+            "//div//span[contains(text(), '{$name}')]"
         );
         assertNotNull($title, sprintf('File at position %s should be named %s', $position, $name));
-    }
-
-    /**
-     * @When /^I click the "([^"]+)" element$/
-     * @param $selector
-     */
-    public function iClickTheElement($selector)
-    {
-        /** @var DocumentElement $page */
-        $page = $this->getMainContext()->getSession()->getPage();
-        $element = $page->find('css', $selector);
-
-        assertNotNull($element, sprintf('Element %s not found', $selector));
-
-        $element->click();
     }
 
     /**
@@ -421,5 +409,14 @@ JS;
         }
         assertNotNull($element, sprintf('HTML field "%s" not found', $locator));
         return $element;
+    }
+
+    /**
+     * @When /^I scroll the editor details panel to the top$/
+     */
+    public function iScrollTheEditorDetailsPanelToTheTop()
+    {
+        $script = "document.querySelector('.editor__details fieldset').scrollTo(0, 0);";
+        $this->getMainContext()->getSession()->executeScript($script);
     }
 }

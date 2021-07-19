@@ -39,6 +39,7 @@ $gallery-item-label-height: 40px;
 }
 
 .gallery-item--folder {
+  display: flex;
   height: $gallery-folder-height;
 
   .gallery-item__thumbnail {
@@ -337,7 +338,8 @@ $gallery-item-label-height: 40px;
 
 .gallery-item__progress-bar {
   height: 100%;
-  background: $brand-primary;
+  background: $mid-blue;
+  transition: width $transition-speed-mid ease;
   width: 0%;
 }
 

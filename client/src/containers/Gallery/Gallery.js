@@ -12,6 +12,7 @@ import TableView from 'containers/TableView/TableView';
 import CONSTANTS from 'constants/index';
 import FormAlert from 'components/FormAlert/FormAlert';
 import * as galleryActions from 'state/gallery/GalleryActions';
+import * as toastsActions from 'state/toasts/ToastsActions';
 import * as queuedFilesActions from 'state/queuedFiles/QueuedFilesActions';
 import * as confirmDeletionActions from 'state/confirmDeletion/ConfirmDeletionActions';
 import moveFilesMutation from 'state/files/moveFilesMutation';
@@ -19,6 +20,7 @@ import { withApollo } from 'react-apollo';
 import { SelectableGroup } from 'react-selectable';
 import GalleryDND from './GalleryDND';
 import configShape from 'lib/configShape';
+import getStatusCodeMessage from 'lib/getStatusCodeMessage';
 import MoveModal from '../MoveModal/MoveModal';
 import { inject } from 'lib/Injector';
 import PropTypes from 'prop-types';
@@ -256,13 +258,12 @@ class Gallery extends Component {
     return this.props.onPublish(publishItems)
       .then((resultItems) => {
         this.props.actions.gallery.setLoading(false);
-        this.props.actions.gallery.setNoticeMessage(
+        this.props.actions.toasts.success(
           i18n.sprintf(
             i18n._t('AssetAdmin.BULK_ACTIONS_PUBLISH_SUCCESS', '%s folders/files were successfully published.'),
             resultItems.length
           )
         );
-        this.props.actions.gallery.setErrorMessage(null);
         this.props.actions.gallery.deselectFiles();
       });
   }
@@ -287,13 +288,12 @@ class Gallery extends Component {
     return this.props.onUnpublish(unpublishItems)
       .then((resultItems) => {
         this.props.actions.gallery.setLoading(false);
-        this.props.actions.gallery.setNoticeMessage(
+        this.props.actions.toasts.success(
           i18n.sprintf(
             i18n._t('AssetAdmin.BULK_ACTIONS_UNPUBLISH_SUCCESS', '%s folders/files were successfully unpublished.'),
             resultItems.length
           )
         );
-        this.props.actions.gallery.setErrorMessage(null);
         this.props.actions.gallery.deselectFiles();
       });
   }
@@ -435,7 +435,10 @@ class Gallery extends Component {
   }
 
   handleFailedUpload(fileXhr, response) {
-    this.props.actions.queuedFiles.failUpload(fileXhr._queuedId, response);
+    const statusCodeMessage = fileXhr.xhr && fileXhr.xhr.status
+      ? getStatusCodeMessage(fileXhr.xhr.status)
+      : '';
+    this.props.actions.queuedFiles.failUpload(fileXhr._queuedId, response, statusCodeMessage);
   }
 
   /**
@@ -572,8 +575,6 @@ class Gallery extends Component {
    */
   handleOpenFolder(event, folder) {
     event.preventDefault();
-    this.props.actions.gallery.setErrorMessage(null);
-    this.props.actions.gallery.setNoticeMessage(null);
     this.props.onOpenFolder(folder.id);
   }
 
@@ -662,7 +663,7 @@ class Gallery extends Component {
         }
       })
       .catch(() => {
-        this.props.actions.gallery.setErrorMessage(
+        this.props.actions.toasts.error(
           i18n._t('AssetAdmin.FAILED_MOVE', 'There was an error moving the selected items.')
         );
       });
@@ -768,11 +769,14 @@ class Gallery extends Component {
    */
   renderGalleryView() {
     const GalleryView = (this.props.view === 'table') ? TableView : ThumbnailView;
-    const files = this.props.files.map((file) => ({
-      ...file,
-      selected: this.itemIsSelected(file.id),
-      highlighted: this.itemIsHighlighted(file.id),
-    }));
+    const files = this.props.files.map((file) => {
+      const selected = this.itemIsSelected(file.id);
+      const highlighted = this.itemIsHighlighted(file.id);
+      const key =
+        (file.queuedId ? `queueId${file.queuedId}` : `id${file.id}`) +
+        (selected ? '--selected' : '');
+      return ({ ...file, selected, highlighted, key });
+    });
     const {
       type,
       loading,
@@ -1110,6 +1114,7 @@ function mapDispatchToProps(dispatch) {
   return {
     actions: {
       gallery: bindActionCreators(galleryActions, dispatch),
+      toasts: bindActionCreators(toastsActions, dispatch),
       queuedFiles: bindActionCreators(queuedFilesActions, dispatch),
       confirmDeletion: bindActionCreators(confirmDeletionActions, dispatch)
     },

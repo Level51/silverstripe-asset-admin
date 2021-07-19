@@ -43,6 +43,8 @@ Feature: Insert an image into a page
       Then I should see the "Form_fileInsertForm" form
       And I should see the "Insert file" button
     When I fill in "Alternative text (alt)" with "My alt"
+      # Filling in width is purely to get the framework to scroll-up so that the details button is in view
+      And I scroll the editor details panel to the top
       And I press the "Details" button
       Then I should see the "Form_fileEditForm" form
       And I should not see an ".gallery-item--selectable" element
@@ -54,7 +56,7 @@ Feature: Insert an image into a page
       And I should see "File One" in the ".editor__heading" element
     When I press the "Details" button
       Then I should see the "Form_fileEditForm" form
-    When I click the ".editor-header__back-button" element
+    When I click on the ".editor-header__back-button" element
       Then I should see the "Form_fileInsertForm" form
     When I press the "Insert file" button
       Then the "Content" HTML field should contain "file1.jpg"
@@ -64,6 +66,8 @@ Feature: Insert an image into a page
     When I select the image "file1.jpg" in the "Content" HTML field
       And I press the "Insert from Files" HTML field button
       Then I should see the "Update file" button
+      # Assert redux override functionality
+      Then I should see an "#Form_fileInsertForm_AltText[value='My alt']" element
     When I press the "Details" button
       And I fill in "Form_fileEditForm_Title" with "file one updated"
       And I press the "Save" button
